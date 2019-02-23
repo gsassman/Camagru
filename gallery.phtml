@@ -1,0 +1,94 @@
+<!doctype html>
+<html>
+    <head>
+        <title>Gallery</title>
+        <link rel="stylesheet" type="text/css" href="./css/gallery.css">
+    </head>
+    <body>
+        <div class="border">
+</body>
+
+<?php
+ echo file_get_contents("nav.phtml" );
+ session_start();
+ include('config/connection.php');
+ $image=$_POST['image'];
+ try{
+     $conn = new PDO("mysql:host=localhost;dbname=camagru","root","password");
+     $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+     $display = "SELECT * FROM images ORDER BY p_id DESC ";
+     $do = $conn->query($display);
+
+    $i = 0;
+     while($pics = $do->fetch())
+     {
+         echo '<div class="gallery">';
+         echo '<form method="post" action="gallery.phtml">';
+         echo "<td><img src=\"".$pics['photo']."\" alt=\"\" class='gallery' width='500' height='400'></td>";
+        $pidi = $pics['p_id'];
+        $comme = "SELECT comment FROM comments WHERE pp_id = $pidi";
+        $commen = $conn->query($comme);
+        $j = 0;
+        while($comments = $commen->fetch())
+        {
+            echo "<br>";
+            echo $comments[$j];
+        }
+         echo '<input type="text" name="comm" placeholder="write a comment">';
+         echo '<button name="comment_button" value="comment" type="submit">Comment</button>.';
+         echo '<input type="submit" name="like" value="Like" id="like">';
+         echo "<input type='hidden' value=\"".$pics['p_id']."\" name='p_id'>";
+         echo '<input type="submit" name="delete" value="Delete" id="delete">';
+         echo '</form>';
+         $i++;
+        }
+    }
+   catch(PDOException $e)
+   {
+       echo "error".$e->getMessage();
+   }
+   ?>
+   <?php
+   if((isset($_POST['comment_button'])) && (!empty($_SESSION['email']))){ 
+       $name = $_POST['name'];
+       $p_id = $_POST['p_id'];
+       $comment = $_POST['comm'];
+       $email = $_SESSION['email'];
+
+
+       $res = $conn->prepare("SELECT * FROM `images` WHERE `p_id`=$p_id");
+       $res->execute();
+
+       $data = $res->fetch(PDO::FETCH_ASSOC); 
+       $user_id = $data['user_id'];
+
+       $res = $conn->prepare("SELECT * FROM `users` WHERE `id`=$user_id");
+       $res->execute();
+       
+       $data = $res->fetch(PDO::FETCH_ASSOC); 
+       $notify = $data['notify'];
+
+       $insert = $conn->prepare("INSERT INTO comments(name, pp_id, comment) VALUES('$name', '$p_id','$comment')");
+       $insert->execute();  
+       if ($notify == 1){
+        $headers = 'From:noreply@camagru.com' . "\r\n";
+        mail($email, "Your image on camagru has been commented on", $comment);
+        header ("location: gallery.phmtl");
+       }
+        else {
+            header ("location: gallery.phtml");
+        }
+
+    }
+    if((isset($_POST['like'])) && (!empty($_SESSION['email']))){
+        $p_id = $_POST['p_id'];
+        $like = $conn->prepare("UPDATE images SET likes=+1 WHERE p_id ='$p_id'");
+        $like->bindParam(":p_id",$p_id,PDO::PARAM_INT);
+        $like->execute();
+    }
+    if((isset($_POST['delete'])) && (!empty($_SESSION['email']))){ 
+        $p_id = $_POST['p_id'];
+        $del = $conn->prepare("DELETE FROM images WHERE p_id='$p_id'");
+        $del->bindParam(":p_id",$p_id,PDO::PARAM_INT);
+        $del->execute();
+    }
